@@ -27,6 +27,8 @@ During installation on Windows:
 
 ## Running
 
+Download/Clone the repository
+
 Run the script with:
 python minecraft_stun_slam_tester.py
 Or pressing run on your code editor

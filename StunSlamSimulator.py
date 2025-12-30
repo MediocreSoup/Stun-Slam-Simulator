@@ -1,9 +1,9 @@
 # Minecraft Stun Slam Chance Tester
-# Requirements: pynput, matplotlib
-# Install with: pip install pynput matplotlib
+# Requirements: pynput, matplotlib, numpy
+# Install with: pip install -r requirements.txt
 # Run: python minecraft_stun_slam_tester.py
 # Controls:
-#  - Left Click: record attack
+#  - Left Click: attack
 #  - Key '2': axe keybind
 #  - Key 'r': mace keybind
 #  - Key 'q': quit
