@@ -1,4 +1,5 @@
-# Stun Slam Simulator for Mace PVP
+# Stun-Slam-Simulator
+Perfect your stun slams for minecraft mace pvp.
 
 Note: This is not a minecraft mod, this is an external program just for checking stun slam inputs
 
