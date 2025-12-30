@@ -24,6 +24,10 @@ https://www.python.org/downloads/
 
 ## Running
 
+# 2 Options: Run the python file (recommended) or the windows exe file (mac app support pending)
+
+# Running the Python file:
+
 Download/Clone the repository
 
 Download dependencies with:
@@ -35,6 +39,22 @@ python StunSlamSimulator.py
 Or pressing run on your code editor
 
 Press Esc to quit the program.
+
+# Running the exe file
+
+Download/Clone the repository
+
+compile it yourself with:
+python -m pip install PyInstaller
+python -m PyInstaller --onefile StunSlamSimulator.py
+
+And double click on the exe file that comes out on the other end
+
+Or:
+Download the pre-compiled exe file in a release tag
+put it in a folder (it will auto generate a config file)
+double click, click run anyways, and follow instructions in the console
+
 
 ### Keybind Configuration
 
