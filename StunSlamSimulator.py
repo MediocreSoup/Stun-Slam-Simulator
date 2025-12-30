@@ -1,22 +1,43 @@
 # Minecraft Stun Slam Chance Tester
+#
 # Requirements: pynput, matplotlib, numpy
-# Install with: pip install -r requirements.txt
+# Install: pip install -r requirements.txt
 # Run: python minecraft_stun_slam_tester.py
-# Controls:
-#  - Left Click: attack
-#  - Key '2': axe keybind
-#  - Key 'r': mace keybind
-#  - Key 'q': quit
+#
+# Features:
+#  - Tick-based probability calculation for Minecraft stun slams
+#  - Global keyboard + mouse input capture
+#  - Automatic success chance calculation per attempt
+#  - Running average success rate (failed attempts included)
+#  - Timeline plot with ±2 tick context
+#  - Incomplete attempts handled after 3 ticks of inactivity
+#  - Interactive hotkey rebinding (keyboard + mouse)
+#  - Persistent hotkeys via config.json
+#  - Backspace to rebind at any time
 
 import time
 import threading
+import json
+import os
+from typing import TypedDict
 from pynput import mouse, keyboard
 import matplotlib.pyplot as plt
 import numpy as np
 
+# ================== CONFIG ==================
+CONFIG_FILE = "config.json"
 TICK_MS = 50.0  # 20 TPS
+# ============================================
 
-# Store events as (time_ms, label)
+# ---- Input state ----
+AXE_BIND: Bind | None = None
+MACE_BIND: Bind | None = None
+ATTACK_BIND: Bind | None = None
+
+config_mode = False
+config_step = 0  # 0=axe, 1=mace, 2=attack
+
+# ---- Runtime state ----
 events = []
 start_time = None
 running = True
@@ -26,99 +47,248 @@ lock = threading.Lock()
 attempt_count = 0
 cumulative_prob = 0.0
 
+# ---- Mouse maps ----
+MOUSE_NAME_MAP = {
+    "left": mouse.Button.left,
+    "right": mouse.Button.right,
+    "middle": mouse.Button.middle,
+    "x1": mouse.Button.x1,
+    "x2": mouse.Button.x2,
+}
+MOUSE_NAME_MAP_INV = {v: k for k, v in MOUSE_NAME_MAP.items()}
+
+# ---- Types ------
+class Bind:
+    def __init__(self, type: str, value: str | mouse.Button):
+        self.type = type          # "keyboard" | "mouse"
+        self.value = value        # str | mouse.Button
+
+    def __str__(self):
+        if self.type == "keyboard":
+            return f"Key '{self.value}'"
+        if self.type == "mouse":
+            return f"Mouse '{MOUSE_NAME_MAP_INV[self.value]}'"
+        return "<unbound>"
+
+    def matches_key(self, key):
+        if self.type != "keyboard":
+            return False
+        try:
+            return key.char and key.char.lower() == self.value
+        except AttributeError:
+            return key.name == self.value
+
+    def matches_mouse(self, button):
+        return self.type == "mouse" and self.value == button
+
+    def to_json(self):
+        if self.type == "keyboard":
+            return {"type": "keyboard", "value": self.value}
+        return {"type": "mouse", "value": MOUSE_NAME_MAP_INV[self.value]}
+        
 
 def now_ms():
     return time.perf_counter() * 1000.0
 
+
+# ---- Config load/save ----
+
+def load_config() -> dict[str, Bind] | None:
+    if not os.path.exists(CONFIG_FILE):
+        return None
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+
+        def parse(entry):
+            if entry["type"] == "keyboard":
+                return Bind("keyboard", entry["value"])
+            return Bind("mouse", MOUSE_NAME_MAP[entry["value"]])
+
+        return {
+            "axe": parse(data["axe"]),
+            "mace": parse(data["mace"]),
+            "attack": parse(data["attack"]),
+        }
+    except Exception as e:
+        print(f"Failed to load config.json: {e}")
+        return None
+    
+def capture_bind(prompt: str) -> Bind:
+    print(prompt)
+    result = {"bind": None} # To get around typing checks ig? What did brochacho GPT even cook up?
+    done = threading.Event()
+
+    def on_press(key):
+        if key == keyboard.Key.esc:
+            print("\nExiting.")
+            os._exit(0)
+            
+        # Do NOT allow backspace or esc to be bound
+        if key in (keyboard.Key.backspace, keyboard.Key.esc):
+            print("That key cannot be bound. Try again.")
+            return
+            
+        try:
+            result["bind"] = Bind("keyboard", key.char.lower())
+        except AttributeError:
+            result["bind"] = Bind("keyboard", key.name)
+        done.set()
+        return False
+
+    def on_click(x, y, button, pressed):
+        if pressed:
+            result["bind"] = Bind("mouse", button)
+            done.set()
+            return False
+
+    kl = keyboard.Listener(on_press=on_press)
+    ml = mouse.Listener(on_click=on_click)
+    kl.start()
+    ml.start()
+
+    done.wait()
+
+    kl.stop()
+    ml.stop()
+    
+    print(f"Bind set to {result["bind"]}")
+
+    return result["bind"]
+
+
+def load_binds() -> dict[str, Bind]:
+    binds = load_config()
+
+    if binds is None:
+        print("No keybinds found. Entering config mode.\n")
+        binds = {
+            "axe": capture_bind("Press your AXE key or mouse button:"),
+            "mace": capture_bind("Press your MACE key or mouse button:"),
+            "attack": capture_bind("Press your ATTACK key or mouse button:"),
+        }
+        save_config(binds)
+    else:
+        print("Loaded keybinds:")
+        for k, v in binds.items():
+            print(f" {k.capitalize():6}: {v}")
+        print("Press BACKSPACE at startup to rebind.\n")
+
+    return binds
+
+
+
+def save_config(binds: dict[str, Bind]):
+    data = {
+        k: v.to_json()
+        for k, v in binds.items()
+    }
+
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+    print("=== CONFIG SAVED ===")
+    for k, v in binds.items():
+        print(f" {k.capitalize():6}: {v}")
+    print()
+
+
+# ---- Reset ----
 
 def reset():
     global events, start_time
     with lock:
         events = []
         start_time = now_ms()
-    print("Reset. Try a stun slam...")
+    print("Reset. Try a stun slam... \n")
 
+
+# ---- Input listeners ----
 
 def on_click(x, y, button, pressed):
-    if not pressed:
+    if not pressed or start_time is None:
         return
-    if button == mouse.Button.left:
-        with lock:
-            if start_time is None:
-                return
-            events.append((now_ms() - start_time, 'LC'))
+
+    if AXE_BIND.matches_mouse(button): # type: ignore
+        events.append((now_ms() - start_time, "AXE"))
+    if MACE_BIND.matches_mouse(button): # type: ignore
+        events.append((now_ms() - start_time, "MACE"))
+    if ATTACK_BIND.matches_mouse(button): # type: ignore
+        events.append((now_ms() - start_time, "ATTACK"))
 
 
 def on_press(key):
     global running
-    try:
-        k = key.char
-    except AttributeError:
-        return
+    global AXE_BIND, MACE_BIND, ATTACK_BIND
 
-    if k == '2':
-        with lock:
-            if start_time is None:
-                return
-            events.append((now_ms() - start_time, 'AXE'))
-    elif k == 'r':
-        with lock:
-            if start_time is None:
-                return
-            events.append((now_ms() - start_time, 'MACE'))
-    elif k.lower() == 'q':
+    if key == keyboard.Key.esc: # Hardcoded quit function
         running = False
         return False
+    
+    if attempt_count == 0 and key == keyboard.Key.backspace:
+        print("\n=== REBINDING HOTKEYS ===")
+        binds = {
+            "axe": capture_bind("Press your AXE key or mouse button:"),
+            "mace": capture_bind("Press your MACE key or mouse button:"),
+            "attack": capture_bind("Press your ATTACK key or mouse button:"),
+        }
+        save_config(binds)
+
+        AXE_BIND = binds["axe"]
+        MACE_BIND = binds["mace"]
+        ATTACK_BIND = binds["attack"]
+
+        print("Rebinding complete. Starting...\n")
+
+        reset()
+        return
+
+    if start_time is None:
+        return
+
+    if AXE_BIND.matches_key(key): # type: ignore
+        events.append((now_ms() - start_time, "AXE"))
+    if MACE_BIND.matches_key(key): # type: ignore
+        events.append((now_ms() - start_time, "MACE"))
+    if ATTACK_BIND.matches_key(key): # type: ignore
+        events.append((now_ms() - start_time, "ATTACK"))
+
 
 
 # ---- Probability calculation ----
 
 def success_for_phase(phase_ms, evs):
-    # phase_ms: offset of tick start relative to start_time in [0, 50)
-    # Determine tick index for each event
     ticks = []
     for t, label in evs:
         tick = int(np.floor((t - phase_ms) / TICK_MS))
-        ticks.append((tick, t, label))
+        ticks.append((tick, label))
 
-    # We need:
-    # same tick: LC + AXE
-    # next tick: LC + MACE
     by_tick = {}
-    for tick, t, label in ticks:
+    for tick, label in ticks:
         by_tick.setdefault(tick, []).append(label)
 
     for tick in by_tick:
-        cur = by_tick.get(tick, [])
-        nxt = by_tick.get(tick + 1, [])
-        if ('LC' in cur and 'AXE' in cur and
-            'LC' in nxt and 'MACE' in nxt):
+        if ('ATTACK' in by_tick.get(tick, []) and
+            'AXE' in by_tick.get(tick, []) and
+            'ATTACK' in by_tick.get(tick + 1, []) and
+            'MACE' in by_tick.get(tick + 1, [])):
             return True
     return False
 
 
 def calculate_probability(evs, resolution=0.05):
-    # resolution in ms for phase sampling
     phases = np.arange(0.0, TICK_MS, resolution)
-    good = 0
-    for p in phases:
-        if success_for_phase(p, evs):
-            good += 1
-    return good / len(phases) if phases.size else 0.0
+    return sum(success_for_phase(p, evs) for p in phases) / len(phases)
 
 
 # ---- Plotting ----
 
 def plot_events(evs):
-    if not evs:
-        return
     times = [t for t, _ in evs]
     labels = [l for _, l in evs]
-
-    y_map = {'LC': 2, 'AXE': 1, 'MACE': 0}
+    y_map = {'ATTACK': 2, 'AXE': 1, 'MACE': 0}
     ys = [y_map[l] for l in labels]
 
-    # Add padding of 1–2 ticks before and after inputs
     pre_padding = 2 * TICK_MS
     post_padding = 2 * TICK_MS
 
@@ -128,19 +298,16 @@ def plot_events(evs):
     plt.figure(figsize=(10, 3))
     plt.scatter(times, ys)
     for t, y, l in zip(times, ys, labels):
-        plt.text(t, y + 0.05, l, fontsize=9, ha='center')
+        plt.text(t, y + 0.05, l, ha='center', fontsize=9)
 
-    # Draw tick grid
     for x in np.arange(0, end_t + TICK_MS, TICK_MS):
         plt.axvline(x, linestyle='--', alpha=0.3)
 
-    plt.yticks([0, 1, 2], ['MACE', 'AXE', 'LC'])
+    plt.yticks([0, 1, 2], ['MACE', 'AXE', 'ATTACK'])
     plt.xlabel('Time (ms)')
     plt.title('Input Timing (±2 Ticks Context)')
     plt.xlim(start_t, end_t)
     plt.tight_layout()
-
-    # Non-blocking show so reset is instant
     plt.show(block=False)
     plt.pause(1.2)
     plt.close()
@@ -149,9 +316,16 @@ def plot_events(evs):
 # ---- Main ----
 
 def main():
-    global start_time, attempt_count, cumulative_prob
-    global start_time
-    print("Stun Slam Tester running. Press 'q' to quit.")
+    global AXE_BIND, MACE_BIND, ATTACK_BIND
+    print("Stun Slam Tester starting...")
+    print("Press Esc at any time to quit the program.")
+
+    binds = load_binds()
+        
+    AXE_BIND = binds['axe']
+    MACE_BIND = binds['mace']
+    ATTACK_BIND = binds['attack']
+
     reset()
 
     m_listener = mouse.Listener(on_click=on_click)
@@ -170,41 +344,35 @@ def main():
             if evs:
                 last_event_time = evs[-1][0]
 
-            # If full attempt is detected
             if len(evs) >= 4:
                 prob = calculate_probability(evs)
-
-                # Update running average
+                global attempt_count, cumulative_prob
                 attempt_count += 1
                 cumulative_prob += prob
-                avg_prob = cumulative_prob / attempt_count
+                avg = cumulative_prob / attempt_count
 
                 print(f"Attempt {attempt_count}")
                 print(f"Current success chance: {prob*100:.2f}%")
-                print(f"Average success chance: {avg_prob*100:.2f}%")
+                print(f"Average success chance: {avg*100:.2f}%")
 
                 plot_events(evs)
                 reset()
                 last_event_time = None
 
-            # If inputs stopped for 3 ticks (incomplete attempt)
             elif last_event_time is not None:
-                idle_time = (now_ms() - start_time) - last_event_time
-                if idle_time >= 3 * TICK_MS:
-                    # Count failed attempt with 0% success chance
+                idle = (now_ms() - start_time) - last_event_time # type: ignore
+                if idle >= 3 * TICK_MS:
                     attempt_count += 1
-                    cumulative_prob += 0.0
-                    avg_prob = cumulative_prob / attempt_count
-
+                    avg = cumulative_prob / attempt_count
                     print(f"Attempt {attempt_count}")
-                    print("Incomplete stun slam attempt")
-                    print("Current success chance: 0.00%")
-                    print(f"Average success chance: {avg_prob*100:.2f}%")
-
+                    print("Incomplete attempt (0.00%)")
+                    print(f"Average success chance: {avg*100:.2f}%")
                     plot_events(evs)
                     reset()
                     last_event_time = None
-
+                    
+        print("\nExiting.")
+        os._exit(0)
     finally:
         m_listener.stop()
         k_listener.stop()
@@ -212,3 +380,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    

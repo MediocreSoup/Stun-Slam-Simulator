@@ -33,6 +33,25 @@ Run the script with:
 python minecraft_stun_slam_tester.py
 Or pressing run on your code editor
 
+Press Esc to quit the program.
+
+### Keybind Configuration
+
+On first launch, the program will prompt you to set your keybinds.
+
+Binds are saved to `config.json` and loaded automatically on future runs.
+
+To change keybinds later:
+- Press **Backspace** at any time
+
+Supported inputs:
+- Keyboard keys (letters, numbers)
+- Mouse buttons (left, right, middle, side buttons 1 and 2)
+
+Double binding as allowed in 1.21.11 is allowed.
+
+
 ## Important Notes
 
-Press q to quit the program
+If something goes HORRIBLY WRONG, to force quit the program:
+Click on the terminal and press Ctrl + C
