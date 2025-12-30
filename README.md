@@ -22,15 +22,16 @@ python --version
 If you do not have Python installed:
 https://www.python.org/downloads/
 
-During installation on Windows:
-✔ Check "Add Python to PATH"
-
 ## Running
 
 Download/Clone the repository
 
+Download dependencies with:
+pip install -r requirements.txt
+(if pip doesnt work try 'python -m pip install -r requirements.txt')
+
 Run the script with:
-python minecraft_stun_slam_tester.py
+python StunSlamSimulator.py
 Or pressing run on your code editor
 
 Press Esc to quit the program.
@@ -49,7 +50,6 @@ Supported inputs:
 - Mouse buttons (left, right, middle, side buttons 1 and 2)
 
 Double binding as allowed in 1.21.11 is allowed.
-
 
 ## Important Notes
 

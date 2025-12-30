@@ -19,7 +19,6 @@ import time
 import threading
 import json
 import os
-from typing import TypedDict
 from pynput import mouse, keyboard
 import matplotlib.pyplot as plt
 import numpy as np
@@ -163,9 +162,9 @@ def load_binds() -> dict[str, Bind]:
     if binds is None:
         print("No keybinds found. Entering config mode.\n")
         binds = {
-            "axe": capture_bind("Press your AXE key or mouse button:"),
-            "mace": capture_bind("Press your MACE key or mouse button:"),
-            "attack": capture_bind("Press your ATTACK key or mouse button:"),
+            "axe": capture_bind("Press your AXE hotkey:"),
+            "mace": capture_bind("Press your MACE hotkey:"),
+            "attack": capture_bind("Press your ATTACK hotkey:"),
         }
         save_config(binds)
     else:
@@ -228,9 +227,9 @@ def on_press(key):
     if attempt_count == 0 and key == keyboard.Key.backspace:
         print("\n=== REBINDING HOTKEYS ===")
         binds = {
-            "axe": capture_bind("Press your AXE key or mouse button:"),
-            "mace": capture_bind("Press your MACE key or mouse button:"),
-            "attack": capture_bind("Press your ATTACK key or mouse button:"),
+            "axe": capture_bind("Press your AXE hotkey:"),
+            "mace": capture_bind("Press your MACE hotkey:"),
+            "attack": capture_bind("Press your ATTACK hotkey:"),
         }
         save_config(binds)
 
