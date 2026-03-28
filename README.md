@@ -10,6 +10,12 @@ This Tool:
 - Shows a timing graph after each attempt
 - Tracks your average stun slam success rate
 
+## Important Notes
+
+If something goes HORRIBLY WRONG, to force quit the program:
+Click on the terminal and press Ctrl + C
+
+
 ## Requirements
 
 - Windows, macOS, or Linux
@@ -45,7 +51,9 @@ Press Esc to quit the program.
 Download/Clone the repository
 
 compile it yourself with:
+
 python -m pip install PyInstaller
+
 python -m PyInstaller --onefile StunSlamSimulator.py
 
 And double click on the exe file that comes out on the other end
@@ -70,8 +78,3 @@ Supported inputs:
 - Mouse buttons (left, right, middle, side buttons 1 and 2)
 
 Double binding as allowed in 1.21.11 is allowed.
-
-## Important Notes
-
-If something goes HORRIBLY WRONG, to force quit the program:
-Click on the terminal and press Ctrl + C
