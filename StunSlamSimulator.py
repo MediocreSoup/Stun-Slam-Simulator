@@ -15,6 +15,7 @@
 #  - Persistent hotkeys via config.json
 #  - Backspace to rebind at any time
 
+from __future__ import annotations
 import time
 import threading
 import json
