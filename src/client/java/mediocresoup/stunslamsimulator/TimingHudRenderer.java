@@ -69,7 +69,7 @@ public final class TimingHudRenderer {
 
         // Render text section with dynamic Y offsets
         int currentTextY = y + PADDING;
-        ctx.drawString(client.font, "Stun Slam Tester", x + PADDING, currentTextY, 0xFFFFFFFF, true);
+        ctx.drawString(client.font, "Stun Slam Simulator", x + PADDING, currentTextY, 0xFFFFFFFF, true);
         currentTextY += LINE_SPACING;
         ctx.drawString(client.font, chanceLine(state), x + PADDING, currentTextY, 0xFFD0D0D0, true);
         currentTextY += LINE_SPACING;
