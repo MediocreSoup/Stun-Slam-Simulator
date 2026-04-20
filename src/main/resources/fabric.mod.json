@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "stun-slam-simulator",
+	"version": "1.0.0",
+	"name": "Stun Slam Simulator",
+	"description": "A client-side timing tester for Minecraft stun slams.",
+	"authors": [
+		"MediocreSoup"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/stun-slam-simulator/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"mediocresoup.stunslamsimulator.StunSlamSimulator"
+		],
+		"client": [
+			"mediocresoup.stunslamsimulator.StunSlamSimulatorClient"
+		]
+	},
+	"mixins": [
+		"stun-slam-simulator.mixins.json",
+		{
+			"config": "stun-slam-simulator.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
