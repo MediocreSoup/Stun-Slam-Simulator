@@ -25,38 +25,24 @@ public class ConfigScreen extends Screen {
                         })
                 .bounds(this.width / 2 - 100, this.height / 2 - 40, 200, 20)
                 .build();
-
         this.addRenderableWidget(toggleButton);
 
-        // Axe Slot button
-        Button axeSlotButton = Button.builder(
-                        Component.literal("Axe Hotbar Slot: " + (config.getAxeSlot() + 1)),
+        // Show Inputs button
+        Button inputsButton = Button.builder(
+                        Component.literal("Show Inputs: " + (config.isShowInputs() ? "ON" : "OFF")),
                         button -> {
-                            config.cycleAxeSlot();
-                            button.setMessage(Component.literal("Axe Hotbar Slot: " + (config.getAxeSlot() + 1)));
+                            config.toggleShowInputs();
+                            button.setMessage(Component.literal("Show Inputs: " + (config.isShowInputs() ? "ON" : "OFF")));
                         })
                 .bounds(this.width / 2 - 100, this.height / 2 - 16, 200, 20)
                 .build();
-
-        this.addRenderableWidget(axeSlotButton);
-
-        // Mace Slot button
-        Button maceSlotButton = Button.builder(
-                        Component.literal("Mace Hotbar Slot: " + (config.getMaceSlot() + 1)),
-                        button -> {
-                            config.cycleMaceSlot();
-                            button.setMessage(Component.literal("Mace Hotbar Slot: " + (config.getMaceSlot() + 1)));
-                        })
-                .bounds(this.width / 2 - 100, this.height / 2 + 8, 200, 20)
-                .build();
-
-        this.addRenderableWidget(maceSlotButton);
+        this.addRenderableWidget(inputsButton);
 
         // Done button
         Button doneButton = Button.builder(
                         Component.literal("Done"),
                         button -> onClose())
-                .bounds(this.width / 2 - 100, this.height / 2 + 32, 200, 20)
+                .bounds(this.width / 2 - 100, this.height / 2 + 8, 200, 20)
                 .build();
 
         this.addRenderableWidget(doneButton);

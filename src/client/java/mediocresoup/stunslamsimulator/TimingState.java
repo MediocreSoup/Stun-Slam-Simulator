@@ -5,13 +5,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 public final class TimingState {
     private static final double TICK_MS = 50.0;
@@ -20,6 +19,11 @@ public final class TimingState {
 
     private final List<InputEvent> liveEvents = new ArrayList<>();
     private List<InputEvent> lastEvents = List.of();
+    
+    private final Deque<Long> tickHistoryNs = new ArrayDeque<>();
+    private final Deque<Long> frameHistoryNs = new ArrayDeque<>();
+    private List<Double> lastTickOffsets = List.of();
+    private List<Double> lastFrameOffsets = List.of();
 
     private long attemptStartNs = -1L;
     private long lastEventNs = -1L;
@@ -40,8 +44,12 @@ public final class TimingState {
         MouseButtonEvent mouseEvent = new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(button, 0));
 
         recordIfMatch(client.options.keyAttack.matchesMouse(mouseEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matchesMouse(mouseEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matchesMouse(mouseEvent), ActionType.MACE, now);
+
+        for (int i = 0; i < 9; i++) {
+            if (client.options.keyHotbarSlots[i].matchesMouse(mouseEvent)) {
+                checkHotbarSlot(client, i, now);
+            }
+        }
     }
 
     public synchronized void handleRawKey(Minecraft client, int keyCode, int scanCode, int action) {
@@ -53,14 +61,37 @@ public final class TimingState {
         KeyEvent keyEvent = new KeyEvent(keyCode, scanCode, 0);
 
         recordIfMatch(client.options.keyAttack.matches(keyEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matches(keyEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matches(keyEvent), ActionType.MACE, now);
+
+        for (int i = 0; i < 9; i++) {
+            if (client.options.keyHotbarSlots[i].matches(keyEvent)) {
+                checkHotbarSlot(client, i, now);
+            }
+        }
+    }
+
+    private void checkHotbarSlot(Minecraft client, int slot, long now) {
+        if (client.player == null) return;
+        
+        ItemStack stack = client.player.getInventory().getItem(slot);
+        if (stack.isEmpty()) return;
+
+        // Detect Axes (Shield breakers)
+        if (stack.getItem() instanceof AxeItem) {
+            recordIfMatch(true, ActionType.AXE, now);
+        } 
+        // Detect Mace
+        else if (stack.getItem() == Items.MACE) {
+            recordIfMatch(true, ActionType.MACE, now);
+        }
     }
 
     public synchronized void tick(Minecraft client) {
         if (client.player == null) {
             return;
         }
+
+        tickHistoryNs.addLast(System.nanoTime());
+        if (tickHistoryNs.size() > 40) tickHistoryNs.removeFirst();
 
         boolean onGround = client.player.onGround();
 
@@ -98,17 +129,53 @@ public final class TimingState {
         status = "Waiting for jump";
     }
 
+    public synchronized void recordFrame() {
+        frameHistoryNs.addLast(System.nanoTime());
+        if (frameHistoryNs.size() > 1000) frameHistoryNs.removeFirst();
+    }
+
+    private List<Double> getOffsetsRelativeToStart(Collection<Long> nanos) {
+        if (attemptStartNs < 0 && lastEvents.isEmpty()) return List.of();
+        
+        long referenceNs = hasLiveAttempt() ? attemptStartNs : (long) (System.nanoTime() - (lastEvents.get(lastEvents.size()-1).timeMs() * 1_000_000L));
+        // If not live, we use the inferred start of the last attempt
+        if (!hasLiveAttempt() && !lastEvents.isEmpty()) referenceNs = -1; // Fallback handled in HUD
+        
+        return nanos.stream()
+                .map(n -> (n - attemptStartNs) / 1_000_000.0)
+                .toList();
+    }
+
     public synchronized void resetStats() {
+        this.attemptCount = 0;
+        this.cumulativeChance = 0.0;
+        this.lastChance = 0.0;
+        this.lastEvents = List.of();
+        this.lastTickOffsets = List.of();
+        this.lastFrameOffsets = List.of();
         resetCurrentAttempt();
-        lastEvents = List.of();
-        attemptCount = 0;
-        cumulativeChance = 0.0;
-        lastChance = 0.0;
-        status = "Waiting for jump";
     }
 
     public synchronized List<InputEvent> eventsForRender() {
         return liveEvents.isEmpty() ? lastEvents : List.copyOf(liveEvents);
+    }
+
+    public synchronized List<Double> tickOffsetsForRender() {
+        if (!hasLiveAttempt()) return lastTickOffsets;
+        List<Double> offsets = new ArrayList<>();
+        for (Long t : tickHistoryNs) {
+            offsets.add((t - attemptStartNs) / 1_000_000.0);
+        }
+        return offsets;
+    }
+
+    public synchronized List<Double> frameOffsetsForRender() {
+        if (!hasLiveAttempt()) return lastFrameOffsets;
+        List<Double> offsets = new ArrayList<>();
+        for (Long f : frameHistoryNs) {
+            offsets.add((f - attemptStartNs) / 1_000_000.0);
+        }
+        return offsets;
     }
 
     public synchronized int getAttemptCount() {
@@ -129,6 +196,10 @@ public final class TimingState {
 
     public synchronized boolean hasLiveAttempt() {
         return !liveEvents.isEmpty();
+    }
+
+    public synchronized long getAttemptStartNs() {
+        return attemptStartNs;
     }
 
     public synchronized int getLiveEventCount() {
@@ -175,6 +246,8 @@ public final class TimingState {
 
     private void finishAttempt(boolean incomplete) {
         lastEvents = List.copyOf(liveEvents);
+        lastTickOffsets = tickOffsetsForRender();
+        lastFrameOffsets = frameOffsetsForRender();
 
         if (incomplete) {
             lastChance = 0.0;
