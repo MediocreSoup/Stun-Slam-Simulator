@@ -20,6 +20,8 @@ public final class TimingState {
 
     private final List<InputEvent> liveEvents = new ArrayList<>();
     private List<InputEvent> lastEvents = List.of();
+    private final List<Double> liveTickOffsets = new ArrayList<>();
+    private List<Double> lastTickOffsets = List.of();
 
     private long attemptStartNs = -1L;
     private long lastEventNs = -1L;
@@ -40,8 +42,8 @@ public final class TimingState {
         MouseButtonEvent mouseEvent = new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(button, 0));
 
         recordIfMatch(client.options.keyAttack.matchesMouse(mouseEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matchesMouse(mouseEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matchesMouse(mouseEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[1].matchesMouse(mouseEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[3].matchesMouse(mouseEvent), ActionType.MACE, now);
     }
 
     public synchronized void handleRawKey(Minecraft client, int keyCode, int scanCode, int action) {
@@ -53,13 +55,18 @@ public final class TimingState {
         KeyEvent keyEvent = new KeyEvent(keyCode, scanCode, 0);
 
         recordIfMatch(client.options.keyAttack.matches(keyEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matches(keyEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matches(keyEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[1].matches(keyEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[3].matches(keyEvent), ActionType.MACE, now);
     }
 
     public synchronized void tick(Minecraft client) {
         if (client.player == null) {
             return;
+        }
+
+        if (attemptStartNs > 0) {
+            double relMs = (System.nanoTime() - attemptStartNs) / 1_000_000.0;
+            liveTickOffsets.add(relMs);
         }
 
         boolean onGround = client.player.onGround();
@@ -93,22 +100,27 @@ public final class TimingState {
 
     public synchronized void resetCurrentAttempt() {
         liveEvents.clear();
+        liveTickOffsets.clear();
         attemptStartNs = -1L;
         lastEventNs = -1L;
         status = "Waiting for jump";
     }
 
     public synchronized void resetStats() {
+        this.attemptCount = 0;
+        this.cumulativeChance = 0.0;
+        this.lastChance = 0.0;
+        this.lastEvents = List.of();
+        this.lastTickOffsets = List.of();
         resetCurrentAttempt();
-        lastEvents = List.of();
-        attemptCount = 0;
-        cumulativeChance = 0.0;
-        lastChance = 0.0;
-        status = "Waiting for jump";
     }
 
     public synchronized List<InputEvent> eventsForRender() {
         return liveEvents.isEmpty() ? lastEvents : List.copyOf(liveEvents);
+    }
+
+    public synchronized List<Double> tickOffsetsForRender() {
+        return liveEvents.isEmpty() ? lastTickOffsets : List.copyOf(liveTickOffsets);
     }
 
     public synchronized int getAttemptCount() {
@@ -129,6 +141,10 @@ public final class TimingState {
 
     public synchronized boolean hasLiveAttempt() {
         return !liveEvents.isEmpty();
+    }
+
+    public synchronized long getAttemptStartNs() {
+        return attemptStartNs;
     }
 
     public synchronized int getLiveEventCount() {
@@ -175,6 +191,7 @@ public final class TimingState {
 
     private void finishAttempt(boolean incomplete) {
         lastEvents = List.copyOf(liveEvents);
+        lastTickOffsets = List.copyOf(liveTickOffsets);
 
         if (incomplete) {
             lastChance = 0.0;
@@ -188,6 +205,7 @@ public final class TimingState {
         cumulativeChance += lastChance;
 
         liveEvents.clear();
+        liveTickOffsets.clear();
         attemptStartNs = -1L;
         lastEventNs = -1L;
     }

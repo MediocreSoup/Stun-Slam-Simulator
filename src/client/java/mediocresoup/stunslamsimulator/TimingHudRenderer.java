@@ -5,11 +5,13 @@ import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.ArrayList;
 
 public final class TimingHudRenderer {
     private static final int DOT_RADIUS = 3;
     private static final int PLOT_MARGIN = 14;
-    private static final double MIN_HALF_SPAN_MS = 100.0;
+    private static final double MIN_HALF_SPAN_MS = 60.0;
+    private static final double MAX_HALF_SPAN_MS = 250.0;
     private static final double LABEL_PADDING_X = 5.0;
     
     private static final int HUD_X = 10;
@@ -20,7 +22,11 @@ public final class TimingHudRenderer {
     private static final int GRAPH_TOP_MARGIN = 6;
     private static final int GRAPH_HEIGHT = 70;
 
+    private static final List<Double> frameOffsets = new ArrayList<>();
+
     private TimingHudRenderer() {}
+
+    private static long lastFrameTime = -1;
 
     public static void render(GuiGraphics ctx, TimingState state) {
         ModConfig config = ModConfig.getInstance();
@@ -31,6 +37,14 @@ public final class TimingHudRenderer {
         Minecraft client = Minecraft.getInstance();
         if (client.font == null) {
             return;
+        }
+
+        // Capture frame timing
+        long now = System.nanoTime();
+        if (state.hasLiveAttempt()) {
+            frameOffsets.add((now - state.getAttemptStartNs()) / 1_000_000.0);
+        } else {
+            frameOffsets.clear();
         }
 
         // Calculate dynamic dimensions for automatic scaling
@@ -74,10 +88,6 @@ public final class TimingHudRenderer {
         int rowAxe = graphY + graphH / 2;
         int rowMace = graphY + graphH - 12;
 
-        ctx.drawString(client.font, "atk", graphX + 4, rowAttack - 4, 0xFFE0E0E0, true);
-        ctx.drawString(client.font, "axe", graphX + 4, rowAxe - 4, 0xFFE0E0E0, true);
-        ctx.drawString(client.font, "mace", graphX + 4, rowMace - 4, 0xFFE0E0E0, true);
-
         List<InputEvent> events = state.eventsForRender();
         if (events.isEmpty()) {
             ctx.drawString(client.font, "No inputs recorded yet.", graphX + 8, graphY + graphH / 2 - 4, 0xFF808080, true);
@@ -95,30 +105,35 @@ public final class TimingHudRenderer {
         }
 
         double centerMs = totalMs / events.size();
+        // Dynamic scale: tighter span if inputs are close together
         double halfSpanMs = Math.max(
                 MIN_HALF_SPAN_MS,
-                Math.max(centerMs - minMs, maxMs - centerMs) + 25.0
+                Math.min(MAX_HALF_SPAN_MS, Math.max(centerMs - minMs, maxMs - centerMs) * 1.5 + 20.0)
         );
+        
         double startMs = Math.max(0.0, centerMs - halfSpanMs);
         double endMs = centerMs + halfSpanMs;
-        if (endMs - startMs < MIN_HALF_SPAN_MS * 2.0) {
-            endMs = startMs + (MIN_HALF_SPAN_MS * 2.0);
-        }
         double spanMs = Math.max(1.0, endMs - startMs);
 
         int plotX = graphX + PLOT_MARGIN;
         int plotW = graphW - (PLOT_MARGIN * 2);
 
-        double tickStart = Math.floor(startMs / 50.0) * 50.0;
-        for (double tick = tickStart; tick <= endMs + 0.001; tick += 50.0) {
-            int px = plotX + (int) Math.round(((tick - startMs) / spanMs) * plotW);
-            ctx.fill(px, graphY, px + 1, graphY + graphH, 0x33FFFFFF);
+        // Render frame lines (very faint)
+        if (config.isShowInputs()) {
+            for (Double fOffset : frameOffsets) {
+                if (fOffset >= startMs && fOffset <= endMs) {
+                    int px = plotX + (int) Math.round(((fOffset - startMs) / spanMs) * plotW);
+                    ctx.fill(px, graphY + graphH - 10, px + 1, graphY + graphH, 0x11FFFFFF);
+                }
+            }
         }
 
-        double majorTickStart = Math.floor(startMs / 100.0) * 100.0;
-        for (double tick = majorTickStart; tick <= endMs + 0.001; tick += 100.0) {
-            int px = plotX + (int) Math.round(((tick - startMs) / spanMs) * plotW);
-            ctx.fill(px, graphY, px + 1, graphY + graphH, 0x66FFFFFF);
+        // Render actual game tick lines
+        List<Double> ticks = state.tickOffsetsForRender();
+        for (Double tickOffset : ticks) {
+            if (tickOffset < startMs || tickOffset > endMs) continue;
+            int px = plotX + (int) Math.round(((tickOffset - startMs) / spanMs) * plotW);
+            ctx.fill(px, graphY, px + 1, graphY + graphH, 0x44FFFFFF);
         }
 
         for (InputEvent event : events) {
