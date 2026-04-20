@@ -11,20 +11,41 @@ public final class TimingHudRenderer {
     private static final int PLOT_MARGIN = 14;
     private static final double MIN_HALF_SPAN_MS = 100.0;
     private static final double LABEL_PADDING_X = 5.0;
+    
+    private static final int HUD_X = 10;
+    private static final int HUD_Y = 10;
+    private static final int HUD_WIDTH = 280;
+    private static final int PADDING = 8;
+    private static final int LINE_SPACING = 10;
+    private static final int GRAPH_TOP_MARGIN = 6;
+    private static final int GRAPH_HEIGHT = 70;
 
     private TimingHudRenderer() {}
 
     public static void render(GuiGraphics ctx, TimingState state) {
+        ModConfig config = ModConfig.getInstance();
+        if (!config.isEnabled()) {
+            return;
+        }
+
         Minecraft client = Minecraft.getInstance();
         if (client.font == null) {
             return;
         }
 
-        // Tighter, smaller dimensions
-        int x = 10;
-        int y = 10;
-        int w = 280;
-        int h = 130;
+        // Calculate dynamic dimensions for automatic scaling
+        int x = HUD_X;
+        int y = HUD_Y;
+        int w = HUD_WIDTH;
+        
+        int headerLines = 2; // Always show Title and Chance
+        if (config.isShowInputs()) {
+            headerLines++;
+        }
+        
+        int textHeight = headerLines * LINE_SPACING;
+        int graphY = y + PADDING + textHeight + GRAPH_TOP_MARGIN;
+        int h = (graphY + GRAPH_HEIGHT + PADDING) - y;
 
         ctx.fill(x, y, x + w, y + h, 0xB0181818);
         ctx.fill(x, y, x + w, y + 1, 0xFFFFFFFF);
@@ -32,16 +53,20 @@ public final class TimingHudRenderer {
         ctx.fill(x, y, x + 1, y + h, 0xFFFFFFFF);
         ctx.fill(x + w - 1, y, x + w, y + h, 0xFFFFFFFF);
 
-        // Original layout in the empty spot above the graph, with tighter line spacing
-        ctx.drawString(client.font, "Stun Slam Tester", x + 8, y + 8, 0xFFFFFFFF, true);
-        ctx.drawString(client.font, chanceLine(state), x + 8, y + 18, 0xFFD0D0D0, true);
-        ctx.drawString(client.font, "Status: " + state.getStatus(), x + 8, y + 28, 0xFFB8B8B8, true);
-        ctx.drawString(client.font, "Inputs: " + state.getDisplayedInputsSummary(), x + 8, y + 38, 0xFFA0A0A0, true);
+        // Render text section with dynamic Y offsets
+        int currentTextY = y + PADDING;
+        ctx.drawString(client.font, "Stun Slam Tester", x + PADDING, currentTextY, 0xFFFFFFFF, true);
+        currentTextY += LINE_SPACING;
+        ctx.drawString(client.font, chanceLine(state), x + PADDING, currentTextY, 0xFFD0D0D0, true);
+        currentTextY += LINE_SPACING;
+        
+        if (config.isShowInputs()) {
+            ctx.drawString(client.font, "Inputs: " + state.getDisplayedInputsSummary(), x + PADDING, currentTextY, 0xFFA0A0A0, true);
+        }
 
-        int graphX = x + 8;
-        int graphY = y + 54;
-        int graphW = w - 16;
-        int graphH = h - 62;
+        int graphX = x + PADDING;
+        int graphW = w - (PADDING * 2);
+        int graphH = GRAPH_HEIGHT;
 
         ctx.fill(graphX, graphY, graphX + graphW, graphY + graphH, 0xFF0F0F0F);
 

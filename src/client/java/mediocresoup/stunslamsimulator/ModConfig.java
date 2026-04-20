@@ -19,6 +19,7 @@ public final class ModConfig {
     private static ModConfig INSTANCE;
 
     private boolean enabled = true;
+    private boolean showInputs = true;
     private int axeSlot = 5; // Default 6th slot (index 5)
     private int maceSlot = 2; // Default 4th slot (index 3)
 
@@ -43,6 +44,15 @@ public final class ModConfig {
 
     public void toggle() {
         setEnabled(!enabled);
+    }
+
+    public boolean isShowInputs() {
+        return showInputs;
+    }
+
+    public void toggleShowInputs() {
+        this.showInputs = !this.showInputs;
+        save();
     }
 
     public int getAxeSlot() {
