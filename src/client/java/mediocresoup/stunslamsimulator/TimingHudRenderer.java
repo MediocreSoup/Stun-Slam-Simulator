@@ -5,12 +5,11 @@ import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.ArrayList;
 
 public final class TimingHudRenderer {
     private static final int DOT_RADIUS = 3;
     private static final int PLOT_MARGIN = 14;
-    private static final double MIN_HALF_SPAN_MS = 60.0;
+    private static final double MIN_HALF_SPAN_MS = 120.0;
     private static final double MAX_HALF_SPAN_MS = 250.0;
     private static final double LABEL_PADDING_X = 5.0;
     
@@ -22,11 +21,7 @@ public final class TimingHudRenderer {
     private static final int GRAPH_TOP_MARGIN = 6;
     private static final int GRAPH_HEIGHT = 70;
 
-    private static final List<Double> frameOffsets = new ArrayList<>();
-
     private TimingHudRenderer() {}
-
-    private static long lastFrameTime = -1;
 
     public static void render(GuiGraphics ctx, TimingState state) {
         ModConfig config = ModConfig.getInstance();
@@ -39,13 +34,8 @@ public final class TimingHudRenderer {
             return;
         }
 
-        // Capture frame timing
-        long now = System.nanoTime();
-        if (state.hasLiveAttempt()) {
-            frameOffsets.add((now - state.getAttemptStartNs()) / 1_000_000.0);
-        } else {
-            frameOffsets.clear();
-        }
+        // Inform state of a new frame for timing tracking
+        state.recordFrame();
 
         // Calculate dynamic dimensions for automatic scaling
         int x = HUD_X;
@@ -111,7 +101,7 @@ public final class TimingHudRenderer {
                 Math.min(MAX_HALF_SPAN_MS, Math.max(centerMs - minMs, maxMs - centerMs) * 1.5 + 20.0)
         );
         
-        double startMs = Math.max(0.0, centerMs - halfSpanMs);
+        double startMs = centerMs - halfSpanMs;
         double endMs = centerMs + halfSpanMs;
         double spanMs = Math.max(1.0, endMs - startMs);
 
@@ -120,10 +110,11 @@ public final class TimingHudRenderer {
 
         // Render frame lines (very faint)
         if (config.isShowInputs()) {
+            List<Double> frameOffsets = state.frameOffsetsForRender();
             for (Double fOffset : frameOffsets) {
                 if (fOffset >= startMs && fOffset <= endMs) {
                     int px = plotX + (int) Math.round(((fOffset - startMs) / spanMs) * plotW);
-                    ctx.fill(px, graphY + graphH - 10, px + 1, graphY + graphH, 0x11FFFFFF);
+                    ctx.fill(px, graphY + graphH - 20, px + 1, graphY + graphH, 0xFFFF0000);
                 }
             }
         }
@@ -133,7 +124,7 @@ public final class TimingHudRenderer {
         for (Double tickOffset : ticks) {
             if (tickOffset < startMs || tickOffset > endMs) continue;
             int px = plotX + (int) Math.round(((tickOffset - startMs) / spanMs) * plotW);
-            ctx.fill(px, graphY, px + 1, graphY + graphH, 0x44FFFFFF);
+            ctx.fill(px, graphY, px + 1, graphY + graphH, 0xCCFFFFFF);
         }
 
         for (InputEvent event : events) {
