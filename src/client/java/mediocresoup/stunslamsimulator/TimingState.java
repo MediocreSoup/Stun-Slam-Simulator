@@ -39,11 +39,12 @@ public final class TimingState {
         }
 
         long now = System.nanoTime();
+        ModConfig config = ModConfig.getInstance();
         MouseButtonEvent mouseEvent = new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(button, 0));
 
         recordIfMatch(client.options.keyAttack.matchesMouse(mouseEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[1].matchesMouse(mouseEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[3].matchesMouse(mouseEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[config.getAxeSlot()].matchesMouse(mouseEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[config.getMaceSlot()].matchesMouse(mouseEvent), ActionType.MACE, now);
     }
 
     public synchronized void handleRawKey(Minecraft client, int keyCode, int scanCode, int action) {
@@ -52,11 +53,12 @@ public final class TimingState {
         }
 
         long now = System.nanoTime();
+        ModConfig config = ModConfig.getInstance();
         KeyEvent keyEvent = new KeyEvent(keyCode, scanCode, 0);
 
         recordIfMatch(client.options.keyAttack.matches(keyEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[1].matches(keyEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[3].matches(keyEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[config.getAxeSlot()].matches(keyEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[config.getMaceSlot()].matches(keyEvent), ActionType.MACE, now);
     }
 
     public synchronized void tick(Minecraft client) {
