@@ -5,7 +5,8 @@
 	"name": "Stun Slam Simulator",
 	"description": "A client-side timing tester for Minecraft stun slams.",
 	"authors": [
-		"MediocreSoup"
+		"MediocreSoup",
+		"Silly"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
