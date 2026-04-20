@@ -40,8 +40,8 @@ public final class TimingState {
         MouseButtonEvent mouseEvent = new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(button, 0));
 
         recordIfMatch(client.options.keyAttack.matchesMouse(mouseEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[1].matchesMouse(mouseEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[3].matchesMouse(mouseEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matchesMouse(mouseEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matchesMouse(mouseEvent), ActionType.MACE, now);
     }
 
     public synchronized void handleRawKey(Minecraft client, int keyCode, int scanCode, int action) {
@@ -53,8 +53,8 @@ public final class TimingState {
         KeyEvent keyEvent = new KeyEvent(keyCode, scanCode, 0);
 
         recordIfMatch(client.options.keyAttack.matches(keyEvent), ActionType.ATTACK, now);
-        recordIfMatch(client.options.keyHotbarSlots[1].matches(keyEvent), ActionType.AXE, now);
-        recordIfMatch(client.options.keyHotbarSlots[3].matches(keyEvent), ActionType.MACE, now);
+        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getAxeSlot()].matches(keyEvent), ActionType.AXE, now);
+        recordIfMatch(client.options.keyHotbarSlots[ModConfig.getInstance().getMaceSlot()].matches(keyEvent), ActionType.MACE, now);
     }
 
     public synchronized void tick(Minecraft client) {
@@ -95,6 +95,15 @@ public final class TimingState {
         liveEvents.clear();
         attemptStartNs = -1L;
         lastEventNs = -1L;
+        status = "Waiting for jump";
+    }
+
+    public synchronized void resetStats() {
+        resetCurrentAttempt();
+        lastEvents = List.of();
+        attemptCount = 0;
+        cumulativeChance = 0.0;
+        lastChance = 0.0;
         status = "Waiting for jump";
     }
 

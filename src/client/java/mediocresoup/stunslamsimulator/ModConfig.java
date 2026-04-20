@@ -1,0 +1,90 @@
+package mediocresoup.stunslamsimulator;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public final class ModConfig {
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path CONFIG_PATH = FabricLoader.getInstance()
+            .getConfigDir()
+            .resolve("stun-slam-simulator.json");
+
+    private static ModConfig INSTANCE;
+
+    private boolean enabled = true;
+    private int axeSlot = 5; // Default 6th slot (index 5)
+    private int maceSlot = 2; // Default 4th slot (index 3)
+
+    private ModConfig() {
+    }
+
+    public static ModConfig getInstance() {
+        if (INSTANCE == null) {
+            INSTANCE = load();
+        }
+        return INSTANCE;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        save();
+    }
+
+    public void toggle() {
+        setEnabled(!enabled);
+    }
+
+    public int getAxeSlot() {
+        return axeSlot;
+    }
+
+    public void cycleAxeSlot() {
+        axeSlot = (axeSlot + 1) % 9;
+        save();
+    }
+
+    public int getMaceSlot() {
+        return maceSlot;
+    }
+
+    public void cycleMaceSlot() {
+        maceSlot = (maceSlot + 1) % 9;
+        save();
+    }
+
+    public void save() {
+        try (Writer writer = Files.newBufferedWriter(CONFIG_PATH)) {
+            GSON.toJson(this, writer);
+        } catch (IOException e) {
+            StunSlamSimulator.LOGGER.error("Failed to save stun-slam-simulator config", e);
+        }
+    }
+
+    private static ModConfig load() {
+        if (Files.exists(CONFIG_PATH)) {
+            try (Reader reader = Files.newBufferedReader(CONFIG_PATH)) {
+                ModConfig config = GSON.fromJson(reader, ModConfig.class);
+                if (config != null) {
+                    return config;
+                }
+            } catch (Exception e) {
+                StunSlamSimulator.LOGGER.error("Failed to load stun-slam-simulator config, using defaults", e);
+            }
+        }
+
+        ModConfig config = new ModConfig();
+        config.save();
+        return config;
+    }
+}
