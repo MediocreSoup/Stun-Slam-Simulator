@@ -1,6 +1,6 @@
 # Stun Slam Simulator
 
-This mod provides feedback on in game stun slams in mace pvp to perfect them. (1.21.11 only!!)
+This mod tells you the exact sub tick timing of your stun slams inputs to help you perfect your timing. (1.21.11 only!!)
 
 This is an information mod and does not affect gameplay. That being said it is NOT allowed in tier tests.
 
@@ -24,3 +24,6 @@ Some options are togglable with mod menu eg size.
 
 The ```/stunslam toggle``` command can toggle HUD visiblity quickly.
 
+## Support
+
+Feature requests or bug reports are welcome on github issues tab or on the forum page for the mod on the mace discord: [Mace Discord Forum](https://discord.com/channels/1187058381849112606/1454782075759755276)
