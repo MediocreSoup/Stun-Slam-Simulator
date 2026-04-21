@@ -18,6 +18,8 @@ Go in game, get an axe and mace and press your stun slam hotkeys, it will automa
 
 This mod is designed with attribute swapping in mind and only counts tick perfect stun slams (for now).
 
+The hard white lines are the times a tick happens on the client. The soft white lines at the bottom are when every client frame is rendered.
+
 Some options are togglable with mod menu eg size.
 
 The ```/stunslam toggle``` command can toggle HUD visiblity quickly.
