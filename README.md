@@ -4,6 +4,8 @@ This mod provides feedback on in game stun slams in mace pvp to perfect them. (1
 
 This is an information mod and does not affect gameplay. That being said it is NOT allowed in tier tests.
 
+<img width="1920" height="1080" alt="2026-04-21_17 46 03" src="https://github.com/user-attachments/assets/be2c47d5-bc26-4214-bfb8-25bae62734b6" />
+
 ## Downloading
 
 * Find the releases section on the right panel
