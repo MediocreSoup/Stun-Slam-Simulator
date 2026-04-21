@@ -131,19 +131,7 @@ public final class TimingState {
 
     public synchronized void recordFrame() {
         frameHistoryNs.addLast(System.nanoTime());
-        if (frameHistoryNs.size() > 1000) frameHistoryNs.removeFirst();
-    }
-
-    private List<Double> getOffsetsRelativeToStart(Collection<Long> nanos) {
-        if (attemptStartNs < 0 && lastEvents.isEmpty()) return List.of();
-        
-        long referenceNs = hasLiveAttempt() ? attemptStartNs : (long) (System.nanoTime() - (lastEvents.get(lastEvents.size()-1).timeMs() * 1_000_000L));
-        // If not live, we use the inferred start of the last attempt
-        if (!hasLiveAttempt() && !lastEvents.isEmpty()) referenceNs = -1; // Fallback handled in HUD
-        
-        return nanos.stream()
-                .map(n -> (n - attemptStartNs) / 1_000_000.0)
-                .toList();
+        while (frameHistoryNs.size() > 1000) frameHistoryNs.removeFirst();
     }
 
     public synchronized void resetStats() {
@@ -162,18 +150,22 @@ public final class TimingState {
 
     public synchronized List<Double> tickOffsetsForRender() {
         if (!hasLiveAttempt()) return lastTickOffsets;
+        long ref = attemptStartNs;
+
         List<Double> offsets = new ArrayList<>();
         for (Long t : tickHistoryNs) {
-            offsets.add((t - attemptStartNs) / 1_000_000.0);
+            offsets.add((double) (t - ref) / 1_000_000.0);
         }
         return offsets;
     }
 
     public synchronized List<Double> frameOffsetsForRender() {
         if (!hasLiveAttempt()) return lastFrameOffsets;
+        long ref = attemptStartNs;
+
         List<Double> offsets = new ArrayList<>();
         for (Long f : frameHistoryNs) {
-            offsets.add((f - attemptStartNs) / 1_000_000.0);
+            offsets.add((double) (f - ref) / 1_000_000.0);
         }
         return offsets;
     }
@@ -237,6 +229,7 @@ public final class TimingState {
         if (attemptStartNs < 0L) {
             attemptStartNs = nowNs;
             status = "Attempt started";
+            StunSlamSimulator.LOGGER.info("Simulator: Attempt started via {} input", type);
         }
 
         double relMs = (nowNs - attemptStartNs) / 1_000_000.0;
