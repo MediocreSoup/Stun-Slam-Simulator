@@ -14,6 +14,8 @@ This is an information mod and does not affect gameplay. That being said it is N
 
 Go in game, get an axe and mace and press your stun slam hotkeys, it will automatically register inputs based on your hotbar slot.
 
+This mod is designed with attribute swapping in mind and only counts tick perfect stun slams (for now).
+
 Some options are togglable with mod menu eg size.
 
 The ```/stunslam toggle``` command can toggle HUD visiblity quickly.
