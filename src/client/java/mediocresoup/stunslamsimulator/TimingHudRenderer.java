@@ -34,9 +34,6 @@ public final class TimingHudRenderer {
             return;
         }
 
-        // Inform state of a new frame for timing tracking
-        state.recordFrame();
-
         // Calculate dynamic dimensions for automatic scaling
         int x = HUD_X;
         int y = HUD_Y;
@@ -50,6 +47,9 @@ public final class TimingHudRenderer {
         int textHeight = headerLines * LINE_SPACING;
         int graphY = y + PADDING + textHeight + GRAPH_TOP_MARGIN;
         int h = (graphY + GRAPH_HEIGHT + PADDING) - y;
+
+        // Always record frame timing at the start of HUD render
+        state.recordFrame();
 
         ctx.fill(x, y, x + w, y + h, 0xB0181818);
         ctx.fill(x, y, x + w, y + 1, 0xFFFFFFFF);
@@ -84,23 +84,14 @@ public final class TimingHudRenderer {
             return;
         }
 
-        double minMs = Double.POSITIVE_INFINITY;
-        double maxMs = Double.NEGATIVE_INFINITY;
-        double totalMs = 0.0;
-
-        for (InputEvent event : events) {
-            minMs = Math.min(minMs, event.timeMs());
-            maxMs = Math.max(maxMs, event.timeMs());
-            totalMs += event.timeMs();
-        }
-
-        double centerMs = totalMs / events.size();
-        // Dynamic scale: tighter span if inputs are close together
-        double halfSpanMs = Math.max(
-                MIN_HALF_SPAN_MS,
-                Math.min(MAX_HALF_SPAN_MS, Math.max(centerMs - minMs, maxMs - centerMs) * 1.5 + 20.0)
-        );
+        // Robust centering: find the middle of the actual input events
+        double minE = events.stream().mapToDouble(InputEvent::timeMs).min().orElse(0.0);
+        double maxE = events.stream().mapToDouble(InputEvent::timeMs).max().orElse(0.0);
+        double centerMs = (minE + maxE) / 2.0;
         
+        // Calculate dynamic horizontal zoom based on input spread
+        double spread = maxE - minE;
+        double halfSpanMs = Math.max(MIN_HALF_SPAN_MS, Math.min(MAX_HALF_SPAN_MS, (spread * 0.75) + 40.0));
         double startMs = centerMs - halfSpanMs;
         double endMs = centerMs + halfSpanMs;
         double spanMs = Math.max(1.0, endMs - startMs);
@@ -108,18 +99,18 @@ public final class TimingHudRenderer {
         int plotX = graphX + PLOT_MARGIN;
         int plotW = graphW - (PLOT_MARGIN * 2);
 
-        // Render frame lines (very faint)
-        if (config.isShowInputs()) {
+        // 1. Render Frame Lines
+        if (config.isShowFrameLines()) {
             List<Double> frameOffsets = state.frameOffsetsForRender();
             for (Double fOffset : frameOffsets) {
                 if (fOffset >= startMs && fOffset <= endMs) {
-                    int px = plotX + (int) Math.round(((fOffset - startMs) / spanMs) * plotW);
-                    ctx.fill(px, graphY + graphH - 20, px + 1, graphY + graphH, 0xFFFF0000);
+                    int px = plotX + (int) (((fOffset - startMs) / spanMs) * plotW);
+                    ctx.fill(px, graphY + graphH - 10, px + 1, graphY + graphH, 0x22FFFFFF);
                 }
             }
         }
 
-        // Render actual game tick lines
+        // 2. Render Actual Game Tick Lines
         List<Double> ticks = state.tickOffsetsForRender();
         for (Double tickOffset : ticks) {
             if (tickOffset < startMs || tickOffset > endMs) continue;
@@ -127,6 +118,7 @@ public final class TimingHudRenderer {
             ctx.fill(px, graphY, px + 1, graphY + graphH, 0xCCFFFFFF);
         }
 
+        // 3. Render Input Dots
         for (InputEvent event : events) {
             int px = plotX + (int) Math.round(((event.timeMs() - startMs) / spanMs) * plotW);
             int py = switch (event.type()) {

@@ -20,6 +20,7 @@ public final class ModConfig {
 
     private boolean enabled = true;
     private boolean showInputs = true;
+    private boolean showFrameLines = false;
 
     private ModConfig() {
     }
@@ -50,6 +51,15 @@ public final class ModConfig {
 
     public void toggleShowInputs() {
         this.showInputs = !this.showInputs;
+        save();
+    }
+
+    public boolean isShowFrameLines() {
+        return showFrameLines;
+    }
+
+    public void toggleShowFrameLines() {
+        this.showFrameLines = !this.showFrameLines;
         save();
     }
 
