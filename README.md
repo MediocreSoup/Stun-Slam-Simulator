@@ -6,7 +6,7 @@ This is an information mod and does not affect gameplay. That being said it is N
 
 ## Downloading
 
-* Find the tags section on the right panel
+* Find the releases section on the right panel
 * download the .jar file into your mods folder (for 1.21.11 only!!)
 * make sure you have the mods fabric api and mod menu installed
 
