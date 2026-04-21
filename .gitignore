@@ -40,3 +40,10 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+verify_calculations.py
+TimingStateTest.java
+CODE_COMPARISON.md
+QUICK_REFERENCE.md
+STUN_SLAM_CALCULATION_EXPLAINED.md
+TEST_SUMMARY.md
+TESTING_GUIDE.md
