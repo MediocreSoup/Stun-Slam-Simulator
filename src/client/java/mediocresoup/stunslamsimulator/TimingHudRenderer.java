@@ -44,9 +44,32 @@ public final class TimingHudRenderer {
             headerLines++;
         }
         
-        int textHeight = headerLines * LINE_SPACING;
-        int graphY = y + PADDING + textHeight + GRAPH_TOP_MARGIN;
-        int h = (graphY + GRAPH_HEIGHT + PADDING) - y;
+        int textHeight = headerLines * lineSpacing;
+        int hudHeight = padding + textHeight + GRAPH_TOP_MARGIN + graphHeight + padding;
+
+        switch (config.getHudAnchor()) {
+            case "TOP_RIGHT":
+                x = screenWidth - baseWidth - 10;
+                y = 10;
+                break;
+            case "BOTTOM_LEFT":
+                x = 10;
+                y = screenHeight - hudHeight - 10;
+                break;
+            case "BOTTOM_RIGHT":
+                x = screenWidth - baseWidth - 10;
+                y = screenHeight - hudHeight - 10;
+                break;
+            case "TOP_LEFT":
+            default:
+                x = 10;
+                y = 10;
+                break;
+        }
+
+        int w = baseWidth;
+        int graphY = y + padding + textHeight + GRAPH_TOP_MARGIN;
+        int h = (graphY + graphHeight + padding) - y;
 
         // Always record frame timing at the start of HUD render
         state.recordFrame();
