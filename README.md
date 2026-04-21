@@ -1,9 +1,20 @@
 # Stun Slam Simulator
 
-## Setup
+This mod provides feedback on in game stun slams in mace pvp to perfect them. (1.21.11 only!!)
 
-For setup instructions, please see the [Fabric Documentation page](https://docs.fabricmc.net/develop/getting-started/creating-a-project#setting-up) related to the IDE that you are using.
+This is an information mod and does not affect gameplay. That being said it is NOT allowed in tier tests.
 
-## License
+## Downloading
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+* Find the tags section on the right panel
+* download the .jar file into your mods folder (for 1.21.11 only!!)
+* make sure you have the mods fabric api and mod menu installed
+
+## Usage
+
+Go in game, get an axe and mace and press your stun slam hotkeys, it will automatically register inputs based on your hotbar slot.
+
+Some options are togglable with mod menu eg size.
+
+The ```/stunslam toggle``` command can toggle HUD visiblity quickly.
+
