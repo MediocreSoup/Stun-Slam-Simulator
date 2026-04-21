@@ -1,10 +1,10 @@
 package mediocresoup.stunslamsimulator;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-
 import java.util.List;
 import java.util.Locale;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 public final class TimingHudRenderer {
     // Size-dependent constants
@@ -33,8 +33,8 @@ public final class TimingHudRenderer {
     private static final int GRAPH_TOP_MARGIN = 2;
 
     // Size presets - SMALL is now the tiny baseline
-    private static final SizeConfig TINY = new SizeConfig(1, 4, 130, 3, 6, 30, 2.0);
-    private static final SizeConfig SMALL = new SizeConfig(1, 6, 180, 4, 7, 50, 2.5);
+    private static final SizeConfig TINY = new SizeConfig(1, 4, 130, 3, 9, 30, 2.0);
+    private static final SizeConfig SMALL = new SizeConfig(1, 6, 180, 4, 9, 50, 2.5);
     private static final SizeConfig MEDIUM = new SizeConfig(3, 14, 230, 8, 10, 70, 5.0);
     private static final SizeConfig LARGE = new SizeConfig(4, 16, 280, 10, 12, 90, 6.0);
 
@@ -60,8 +60,9 @@ public final class TimingHudRenderer {
             return;
         }
 
-        SizeConfig baseSize = getSizeConfig(config.getHudSize());
-        double scale = 1; //config.getHudScale();
+        String hudSize = config.getHudSize();
+        SizeConfig baseSize = getSizeConfig(hudSize);
+        double scale = 1; //config.getHudScale(); // is it fully deprecated?
 
         // Apply scale multiplier to dimensions
         int dotRadius = Math.max(1, (int)(baseSize.dotRadius * scale));
@@ -129,17 +130,9 @@ public final class TimingHudRenderer {
             currentTextY += lineSpacing;
         }
         
-        // Draw the chance line, abbreviating aggressively for small HUDs
-        String chanceTxt = chanceLine(state);
-        if (w < 180) {
-            // For small HUDs, use very short abbreviations
-            if (state.hasLiveAttempt()) {
-                chanceTxt = "Pending (" + state.getLiveEventCount() + "/4)  " + pct(state.getAverageChance());
-            } else {
-                String chance = state.getAttemptCount() == 0 ? "--" : pct(state.getLastChance());
-                chanceTxt = chance + "  Avg: " + pct(state.getAverageChance());
-            }
-        }
+        // Draw the chance line
+        String chanceTxt = chanceLine(state, hudSize);
+
         drawScaledString(ctx, client.font, chanceTxt, x + padding, currentTextY, 0xFFD0D0D0, scale);
         currentTextY += lineSpacing;
 
@@ -234,17 +227,60 @@ public final class TimingHudRenderer {
         ctx.drawString(font, text, x, y, color, true);
     }
 
-    private static String chanceLine(TimingState state) {
-        if (state.hasLiveAttempt()) {
-            return "Stun slam chance: pending (" + state.getLiveEventCount() + "/4)"
-                    + "   Avg: " + pct(state.getAverageChance())
-                    + "   Attempts: " + state.getAttemptCount();
-        }
+    // Size is either TINY, SMALL, MEDIUM, or LARGE - the chance line adapts to fit
+    private static String chanceLine(TimingState state, String size) {
 
+        boolean live = state.hasLiveAttempt();
+        String avg = pct(state.getAverageChance());
         String chance = state.getAttemptCount() == 0 ? "--" : pct(state.getLastChance());
-        return "Stun slam chance: " + chance
-                + "   Avg: " + pct(state.getAverageChance())
-                + "   Attempts: " + state.getAttemptCount();
+        int attempts = state.getAttemptCount();
+
+        switch (size) {
+            case "TINY":
+                // ~130px → extremely compact
+                if (live) {
+                    return "Pending (" + state.getLiveEventCount() + "/4)  " + avg;
+                } else {
+                    return chance + "  Avg: " + avg;
+                }
+
+            case "SMALL":
+                // ~180px → slightly more info, still compact
+                if (live) {
+                    return "Pending (" + state.getLiveEventCount() + "/4)"
+                            + "  Avg: " + avg
+                            + "  #" + attempts;
+                } else {
+                    return chance
+                            + "  Avg: " + avg
+                            + "  #" + attempts;
+                }
+
+            case "MEDIUM":
+                // ~230px → readable labels, shortened title
+                if (live) {
+                    return "Chance: pending (" + state.getLiveEventCount() + "/4)"
+                            + "  Avg: " + avg
+                            + "  Attempts: " + attempts;
+                } else {
+                    return "Chance: " + chance
+                            + "  Avg: " + avg
+                            + "  Attempts: " + attempts;
+                }
+
+            case "LARGE":
+            default:
+                // ~280px → full verbose version (your original)
+                if (live) {
+                    return "Stun slam chance: pending (" + state.getLiveEventCount() + "/4)"
+                            + "   Avg: " + avg
+                            + "   Attempts: " + attempts;
+                } else {
+                    return "Stun slam chance: " + chance
+                            + "   Avg: " + avg
+                            + "   Attempts: " + attempts;
+                }
+        }
     }
 
     private static String pct(double value) {
