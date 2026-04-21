@@ -7,21 +7,47 @@ import java.util.List;
 import java.util.Locale;
 
 public final class TimingHudRenderer {
-    private static final int DOT_RADIUS = 3;
-    private static final int PLOT_MARGIN = 14;
+    // Size-dependent constants
+    private static class SizeConfig {
+        final int dotRadius;
+        final int plotMargin;
+        final int baseWidth;
+        final int padding;
+        final int lineSpacing;
+        final int graphHeight;
+        final double labelPadding;
+
+        SizeConfig(int dotRadius, int plotMargin, int baseWidth, int padding, int lineSpacing, int graphHeight, double labelPadding) {
+            this.dotRadius = dotRadius;
+            this.plotMargin = plotMargin;
+            this.baseWidth = baseWidth;
+            this.padding = padding;
+            this.lineSpacing = lineSpacing;
+            this.graphHeight = graphHeight;
+            this.labelPadding = labelPadding;
+        }
+    }
+
     private static final double MIN_HALF_SPAN_MS = 120.0;
     private static final double MAX_HALF_SPAN_MS = 250.0;
-    private static final double LABEL_PADDING_X = 5.0;
-    
-    private static final int HUD_X = 10;
-    private static final int HUD_Y = 10;
-    private static final int HUD_WIDTH = 280;
-    private static final int PADDING = 8;
-    private static final int LINE_SPACING = 10;
-    private static final int GRAPH_TOP_MARGIN = 6;
-    private static final int GRAPH_HEIGHT = 70;
+    private static final int GRAPH_TOP_MARGIN = 2;
+
+    // Size presets - SMALL is now the tiny baseline
+    private static final SizeConfig TINY = new SizeConfig(1, 4, 130, 3, 6, 30, 2.0);
+    private static final SizeConfig SMALL = new SizeConfig(1, 6, 180, 4, 7, 50, 2.5);
+    private static final SizeConfig MEDIUM = new SizeConfig(3, 14, 230, 8, 10, 70, 5.0);
+    private static final SizeConfig LARGE = new SizeConfig(4, 16, 280, 10, 12, 90, 6.0);
 
     private TimingHudRenderer() {}
+
+    private static SizeConfig getSizeConfig(String hudSize) {
+        return switch (hudSize) {
+            case "TINY" -> TINY;
+            case "MEDIUM" -> MEDIUM;
+            case "LARGE" -> LARGE;
+            default -> SMALL;
+        };
+    }
 
     public static void render(GuiGraphics ctx, TimingState state) {
         ModConfig config = ModConfig.getInstance();
@@ -34,16 +60,30 @@ public final class TimingHudRenderer {
             return;
         }
 
-        // Calculate dynamic dimensions for automatic scaling
-        int x = HUD_X;
-        int y = HUD_Y;
-        int w = HUD_WIDTH;
-        
-        int headerLines = 2; // Always show Title and Chance
+        SizeConfig baseSize = getSizeConfig(config.getHudSize());
+        double scale = 1; //config.getHudScale();
+
+        // Apply scale multiplier to dimensions
+        int dotRadius = Math.max(1, (int)(baseSize.dotRadius * scale));
+        int plotMargin = Math.max(6, (int)(baseSize.plotMargin * scale));
+        int baseWidth = (int)(baseSize.baseWidth * scale);
+        int padding = Math.max(4, (int)(baseSize.padding * scale));
+        int lineSpacing = Math.max(7, (int)(baseSize.lineSpacing * scale));
+        int graphHeight = Math.max(30, (int)(baseSize.graphHeight * scale));
+
+        // Calculate position based on anchor
+        int x, y;
+        int screenWidth = client.getWindow().getGuiScaledWidth();
+        int screenHeight = client.getWindow().getGuiScaledHeight();
+
+        int headerLines = 1; // Always have the chance line
+        if (config.isShowTitle()) {
+            headerLines++;
+        }
         if (config.isShowInputs()) {
             headerLines++;
         }
-        
+
         int textHeight = headerLines * lineSpacing;
         int hudHeight = padding + textHeight + GRAPH_TOP_MARGIN + graphHeight + padding;
 
@@ -80,26 +120,47 @@ public final class TimingHudRenderer {
         ctx.fill(x, y, x + 1, y + h, 0xFFFFFFFF);
         ctx.fill(x + w - 1, y, x + w, y + h, 0xFFFFFFFF);
 
-        // Render text section with dynamic Y offsets
-        int currentTextY = y + PADDING;
-        ctx.drawString(client.font, "Stun Slam Simulator", x + PADDING, currentTextY, 0xFFFFFFFF, true);
-        currentTextY += LINE_SPACING;
-        ctx.drawString(client.font, chanceLine(state), x + PADDING, currentTextY, 0xFFD0D0D0, true);
-        currentTextY += LINE_SPACING;
+        // Render text section
+        int currentTextY = y + padding;
         
+        // Render title if enabled
+        if (config.isShowTitle()) {
+            drawScaledString(ctx, client.font, "Stun Slam Simulator", x + padding, currentTextY, 0xFFFFFFFF, scale);
+            currentTextY += lineSpacing;
+        }
+        
+        // Draw the chance line, abbreviating aggressively for small HUDs
+        String chanceTxt = chanceLine(state);
+        if (w < 180) {
+            // For small HUDs, use very short abbreviations
+            if (state.hasLiveAttempt()) {
+                chanceTxt = "Pending (" + state.getLiveEventCount() + "/4)  " + pct(state.getAverageChance());
+            } else {
+                String chance = state.getAttemptCount() == 0 ? "--" : pct(state.getLastChance());
+                chanceTxt = chance + "  Avg: " + pct(state.getAverageChance());
+            }
+        }
+        drawScaledString(ctx, client.font, chanceTxt, x + padding, currentTextY, 0xFFD0D0D0, scale);
+        currentTextY += lineSpacing;
+
         if (config.isShowInputs()) {
-            ctx.drawString(client.font, "Inputs: " + state.getDisplayedInputsSummary(), x + PADDING, currentTextY, 0xFFA0A0A0, true);
+            String inputTxt = state.getDisplayedInputsSummary();
+            if (inputTxt.length() > 30 && w < 180) {
+                // Abbreviate inputs on very small HUDs
+                inputTxt = inputTxt.substring(0, Math.min(30, inputTxt.length())) + "...";
+            }
+            drawScaledString(ctx, client.font, "Inputs: " + inputTxt, x + padding, currentTextY, 0xFFA0A0A0, scale);
         }
 
-        int graphX = x + PADDING;
-        int graphW = w - (PADDING * 2);
-        int graphH = GRAPH_HEIGHT;
+        int graphX = x + padding;
+        int graphW = w - (padding * 2);
+        int graphH = graphHeight;
 
         ctx.fill(graphX, graphY, graphX + graphW, graphY + graphH, 0xFF0F0F0F);
 
-        int rowAttack = graphY + 12;
-        int rowAxe = graphY + graphH / 2;
-        int rowMace = graphY + graphH - 12;
+        int rowAttack = graphY + graphHeight / 6;
+        int rowAxe = graphY + graphHeight / 2;
+        int rowMace = graphY + graphHeight - graphHeight / 6;
 
         List<InputEvent> events = state.eventsForRender();
         if (events.isEmpty()) {
@@ -111,7 +172,7 @@ public final class TimingHudRenderer {
         double minE = events.stream().mapToDouble(InputEvent::timeMs).min().orElse(0.0);
         double maxE = events.stream().mapToDouble(InputEvent::timeMs).max().orElse(0.0);
         double centerMs = (minE + maxE) / 2.0;
-        
+
         // Calculate dynamic horizontal zoom based on input spread
         double spread = maxE - minE;
         double halfSpanMs = Math.max(MIN_HALF_SPAN_MS, Math.min(MAX_HALF_SPAN_MS, (spread * 0.75) + 40.0));
@@ -119,16 +180,16 @@ public final class TimingHudRenderer {
         double endMs = centerMs + halfSpanMs;
         double spanMs = Math.max(1.0, endMs - startMs);
 
-        int plotX = graphX + PLOT_MARGIN;
-        int plotW = graphW - (PLOT_MARGIN * 2);
+        int plotX = graphX + plotMargin;
+        int plotW = graphW - (plotMargin * 2);
 
-        // 1. Render Frame Lines
+        // 1. Render Frame Lines (half opacity of tick lines)
         if (config.isShowFrameLines()) {
             List<Double> frameOffsets = state.frameOffsetsForRender();
             for (Double fOffset : frameOffsets) {
                 if (fOffset >= startMs && fOffset <= endMs) {
                     int px = plotX + (int) (((fOffset - startMs) / spanMs) * plotW);
-                    ctx.fill(px, graphY + graphH - 10, px + 1, graphY + graphH, 0x22FFFFFF);
+                    ctx.fill(px, graphY + graphH - 10, px + 1, graphY + graphH, 0x33FFFFFF);
                 }
             }
         }
@@ -141,7 +202,7 @@ public final class TimingHudRenderer {
             ctx.fill(px, graphY, px + 1, graphY + graphH, 0xCCFFFFFF);
         }
 
-        // 3. Render Input Dots
+        // 3. Render Input Dots (with thinner outline for small dots)
         for (InputEvent event : events) {
             int px = plotX + (int) Math.round(((event.timeMs() - startMs) / spanMs) * plotW);
             int py = switch (event.type()) {
@@ -150,15 +211,27 @@ public final class TimingHudRenderer {
                 case MACE -> rowMace;
             };
 
-            ctx.fill(px - DOT_RADIUS, py - DOT_RADIUS, px + DOT_RADIUS + 1, py + DOT_RADIUS + 1, 0xFFE7E7E7);
-            ctx.fill(px - DOT_RADIUS + 1, py - DOT_RADIUS + 1, px + DOT_RADIUS, py + DOT_RADIUS, colorFor(event.type()));
+            // Draw outline - only if dot is large enough to see it
+            if (dotRadius > 1) {
+                ctx.fill(px - dotRadius, py - dotRadius, px + dotRadius + 1, py + dotRadius + 1, 0xFFE7E7E7);
+                ctx.fill(px - dotRadius + 1, py - dotRadius + 1, px + dotRadius, py + dotRadius, colorFor(event.type()));
+            } else {
+                // For tiny dots, just draw the colored dot without outline
+                ctx.fill(px - dotRadius, py - dotRadius, px + dotRadius + 1, py + dotRadius + 1, colorFor(event.type()));
+            }
 
             String label = shortLabel(event.type());
-            int labelX = px + DOT_RADIUS + (int) LABEL_PADDING_X;
+            int labelX = px + dotRadius + (int)(2.5 * scale);
             int labelY = py - 4;
-            
+
             ctx.drawString(client.font, label, labelX, labelY, 0xFFFFFFFF, false);
         }
+    }
+
+    private static void drawScaledString(GuiGraphics ctx, net.minecraft.client.gui.Font font, String text, int x, int y, int color, double scale) {
+        // For small scales, just draw normally - the text will appear smaller due to the HUD size being smaller
+        // We avoid using matrix transforms which are complex in this API version
+        ctx.drawString(font, text, x, y, color, true);
     }
 
     private static String chanceLine(TimingState state) {

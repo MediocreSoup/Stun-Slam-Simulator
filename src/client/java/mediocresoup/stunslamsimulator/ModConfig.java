@@ -21,6 +21,9 @@ public final class ModConfig {
     private boolean enabled = true;
     private boolean showInputs = true;
     private boolean showFrameLines = false;
+    private boolean showTitle = true;  // Show/hide the "Stun Slam Simulator" title
+    private String hudSize = "SMALL";  // TINY, SMALL, MEDIUM, LARGE (each has fixed scale)
+    private String hudAnchor = "TOP_LEFT"; // Default anchor
 
     private ModConfig() {
     }
@@ -61,6 +64,41 @@ public final class ModConfig {
     public void toggleShowFrameLines() {
         this.showFrameLines = !this.showFrameLines;
         save();
+    }
+
+    public boolean isShowTitle() {
+        return showTitle;
+    }
+
+    public void toggleShowTitle() {
+        this.showTitle = !this.showTitle;
+        save();
+    }
+
+    public String getHudSize() {
+        return hudSize;
+    }
+
+    public void setHudSize(String size) {
+        if (size != null && (size.equals("TINY") || size.equals("SMALL") || size.equals("MEDIUM") || size.equals("LARGE"))) {
+            this.hudSize = size;
+            save();
+        }
+    }
+
+    public String getHudAnchor() {
+        return hudAnchor;
+    }
+
+    public void setHudAnchor(String anchor) {
+        if (anchor != null && (
+                anchor.equals("TOP_LEFT") ||
+                anchor.equals("TOP_RIGHT") ||
+                anchor.equals("BOTTOM_LEFT") ||
+                anchor.equals("BOTTOM_RIGHT"))) {
+            this.hudAnchor = anchor;
+            save();
+        }
     }
 
     public void save() {
