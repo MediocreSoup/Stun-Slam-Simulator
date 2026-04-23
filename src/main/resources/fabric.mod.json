@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "stun-slam-simulator",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"name": "Stun Slam Simulator",
 	"description": "A client-side timing tester for Minecraft stun slams.",
 	"authors": [
