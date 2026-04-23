@@ -123,26 +123,30 @@ public final class TimingHudRenderer {
 
         // Render text section
         int currentTextY = y + padding;
-        
+
+        // DEBUG
+        if (false) {
+            drawScaledString(ctx, client.font, "State: " + state.getStatus(), x + padding, currentTextY, 0xFFFFFFFF, scale);
+            currentTextY += lineSpacing;
+            headerLines++;
+        }
+
         // Render title if enabled
         if (config.isShowTitle()) {
             drawScaledString(ctx, client.font, "Stun Slam Simulator", x + padding, currentTextY, 0xFFFFFFFF, scale);
             currentTextY += lineSpacing;
         }
         
-        // Draw the chance line
+        // Draw the chance line (no disable option)
         String chanceTxt = chanceLine(state, hudSize);
-
         drawScaledString(ctx, client.font, chanceTxt, x + padding, currentTextY, 0xFFD0D0D0, scale);
         currentTextY += lineSpacing;
 
+        // Render inputs summary if enabled
         if (config.isShowInputs()) {
             String inputTxt = state.getDisplayedInputsSummary();
-            if (inputTxt.length() > 30 && w < 180) {
-                // Abbreviate inputs on very small HUDs
-                inputTxt = inputTxt.substring(0, Math.min(30, inputTxt.length())) + "...";
-            }
             drawScaledString(ctx, client.font, "Inputs: " + inputTxt, x + padding, currentTextY, 0xFFA0A0A0, scale);
+            currentTextY += lineSpacing;
         }
 
         int graphX = x + padding;
@@ -161,12 +165,32 @@ public final class TimingHudRenderer {
             return;
         }
 
-        // Robust centering: find the middle of the actual input events
-        double minE = events.stream().mapToDouble(InputEvent::timeMs).min().orElse(0.0);
-        double maxE = events.stream().mapToDouble(InputEvent::timeMs).max().orElse(0.0);
-        double centerMs = (minE + maxE) / 2.0;
+        // Center around AXE and MACE hits for optimal stun slam window visibility
+        double axeTime = events.stream()
+            .filter(e -> e.type() == ActionType.AXE)
+            .mapToDouble(InputEvent::timeMs)
+            .findFirst()
+            .orElse(-1.0);
+        
+        double maceTime = events.stream()
+            .filter(e -> e.type() == ActionType.MACE)
+            .mapToDouble(InputEvent::timeMs)
+            .findFirst()
+            .orElse(-1.0);
+        
+        // Determine center: if both exist, center between them; otherwise use input spread
+        double centerMs;
+        if (axeTime >= 0 && maceTime >= 0) {
+            centerMs = (axeTime + maceTime) / 2.0;
+        } else {
+            double minE = events.stream().mapToDouble(InputEvent::timeMs).min().orElse(0.0);
+            double maxE = events.stream().mapToDouble(InputEvent::timeMs).max().orElse(0.0);
+            centerMs = (minE + maxE) / 2.0;
+        }
 
         // Calculate dynamic horizontal zoom based on input spread
+        double minE = events.stream().mapToDouble(InputEvent::timeMs).min().orElse(0.0);
+        double maxE = events.stream().mapToDouble(InputEvent::timeMs).max().orElse(0.0);
         double spread = maxE - minE;
         double halfSpanMs = Math.max(MIN_HALF_SPAN_MS, Math.min(MAX_HALF_SPAN_MS, (spread * 0.75) + 40.0));
         double startMs = centerMs - halfSpanMs;
@@ -197,7 +221,14 @@ public final class TimingHudRenderer {
 
         // 3. Render Input Dots (with thinner outline for small dots)
         for (InputEvent event : events) {
-            int px = plotX + (int) Math.round(((event.timeMs() - startMs) / spanMs) * plotW);
+            double px_raw = ((event.timeMs() - startMs) / spanMs) * plotW;
+            
+            // Skip inputs that are outside the visible graph
+            if (px_raw < 0 || px_raw > plotW) {
+                continue;
+            }
+            
+            int px = plotX + (int) Math.round(px_raw);
             int py = switch (event.type()) {
                 case ATTACK -> rowAttack;
                 case AXE -> rowAxe;
@@ -230,7 +261,7 @@ public final class TimingHudRenderer {
     // Size is either TINY, SMALL, MEDIUM, or LARGE - the chance line adapts to fit
     private static String chanceLine(TimingState state, String size) {
 
-        boolean live = state.hasLiveAttempt();
+        boolean active = state.hasLiveAttempt();
         String avg = pct(state.getAverageChance());
         String chance = state.getAttemptCount() == 0 ? "--" : pct(state.getLastChance());
         int attempts = state.getAttemptCount();
@@ -238,16 +269,16 @@ public final class TimingHudRenderer {
         switch (size) {
             case "TINY":
                 // ~130px → extremely compact
-                if (live) {
-                    return "Pending (" + state.getLiveEventCount() + "/4)  " + avg;
+                if (active) {
+                    return "Pending  " + avg;
                 } else {
                     return chance + "  Avg: " + avg;
                 }
 
             case "SMALL":
                 // ~180px → slightly more info, still compact
-                if (live) {
-                    return "Pending (" + state.getLiveEventCount() + "/4)"
+                if (active) {
+                    return "Pending"
                             + "  Avg: " + avg
                             + "  #" + attempts;
                 } else {
@@ -258,8 +289,8 @@ public final class TimingHudRenderer {
 
             case "MEDIUM":
                 // ~230px → readable labels, shortened title
-                if (live) {
-                    return "Chance: pending (" + state.getLiveEventCount() + "/4)"
+                if (active) {
+                    return "Chance: Pending"
                             + "  Avg: " + avg
                             + "  Attempts: " + attempts;
                 } else {
@@ -271,8 +302,8 @@ public final class TimingHudRenderer {
             case "LARGE":
             default:
                 // ~280px → full verbose version (your original)
-                if (live) {
-                    return "Stun slam chance: pending (" + state.getLiveEventCount() + "/4)"
+                if (active) {
+                    return "Stun slam chance: Pending"
                             + "   Avg: " + avg
                             + "   Attempts: " + attempts;
                 } else {

@@ -9,13 +9,12 @@ import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-import java.util.ArrayList;
 import java.util.*;
 
 public final class TimingState {
     private static final double TICK_MS = 50.0;
-    private static final double PHASE_STEP_MS = 0.05;
-    private static final long INACTIVITY_TIMEOUT_NS = 3L * 50_000_000L;
+    private static final double PHASE_STEP_MS = 0.05; // how often the brute force search looks for success
+    private static final long INACTIVITY_TIMEOUT_NS = 5 * 50_000_000L;  // 5 ticks
 
     private final List<InputEvent> liveEvents = new ArrayList<>();
     private List<InputEvent> lastEvents = List.of();
@@ -28,12 +27,10 @@ public final class TimingState {
     private long attemptStartNs = -1L;
     private long lastEventNs = -1L;
 
-    private boolean wasOnGround = true;
-
     private int attemptCount = 0;
     private double cumulativeChance = 0.0;
     private double lastChance = 0.0;
-    private String status = "Waiting for jump";
+    private String status = "init"; // "init", "active", "idle"
 
     public synchronized void handleRawMouseButton(Minecraft client, int button, int action) {
         if (client.player == null || action != InputConstants.PRESS) {
@@ -91,34 +88,28 @@ public final class TimingState {
         }
 
         tickHistoryNs.addLast(System.nanoTime());
-        if (tickHistoryNs.size() > 40) tickHistoryNs.removeFirst();
 
-        boolean onGround = client.player.onGround();
-
-        if (wasOnGround && !onGround) {
-            resetCurrentAttempt();
-            status = "Airborne - waiting for inputs";
+        // Only keep a 5 second tick history
+        long cutoff = System.nanoTime() - 5_000_000_000L;
+        while (!tickHistoryNs.isEmpty() && tickHistoryNs.getFirst() < cutoff) {
+            tickHistoryNs.removeFirst();
         }
-
-        if (!wasOnGround && onGround) {
-            if (!liveEvents.isEmpty()) {
-                finishAttempt(true);
-            } else {
-                resetCurrentAttempt();
-            }
-        }
-
-        wasOnGround = onGround;
 
         long now = System.nanoTime();
 
-        if (!liveEvents.isEmpty() && liveEvents.size() >= 4) {
-            finishAttempt(false);
-            return;
-        }
-
+        // After some ticks of inactivity, calculate and display the chance (but keep events)
         if (!liveEvents.isEmpty() && lastEventNs > 0 && now - lastEventNs >= INACTIVITY_TIMEOUT_NS) {
-            finishAttempt(true);
+            if (!hasLiveAttempt()) {
+                // Already calculated, don't recalculate
+                return;
+            }
+            // first frame of going idle
+            // Calculate probability and show result
+            lastEvents = List.copyOf(liveEvents);
+            lastTickOffsets = tickOffsetsForRender();
+            lastFrameOffsets = frameOffsetsForRender();
+            lastChance = calculateProbability(lastEvents);
+            status = "idle";
         }
     }
 
@@ -126,12 +117,22 @@ public final class TimingState {
         liveEvents.clear();
         attemptStartNs = -1L;
         lastEventNs = -1L;
-        status = "Waiting for jump";
+        status = "init";
     }
 
     public synchronized void recordFrame() {
         frameHistoryNs.addLast(System.nanoTime());
-        while (frameHistoryNs.size() > 1000) frameHistoryNs.removeFirst();
+
+        // Only keep a 5 second frame history
+        long cutoff = System.nanoTime() - 5_000_000_000L;
+        while (!frameHistoryNs.isEmpty() && frameHistoryNs.getFirst() < cutoff) {
+            frameHistoryNs.removeFirst();
+        }
+
+        // If we are live then make a full copy of the current frame history for rendering
+        if (status.equals("active")) {
+            lastFrameOffsets = frameOffsetsForRender();
+        }
     }
 
     public synchronized void resetStats() {
@@ -150,6 +151,7 @@ public final class TimingState {
 
     public synchronized List<Double> tickOffsetsForRender() {
         if (!hasLiveAttempt()) return lastTickOffsets;
+
         long ref = attemptStartNs;
 
         List<Double> offsets = new ArrayList<>();
@@ -187,7 +189,7 @@ public final class TimingState {
     }
 
     public synchronized boolean hasLiveAttempt() {
-        return !liveEvents.isEmpty();
+        return status.equals("active");
     }
 
     public synchronized long getAttemptStartNs() {
@@ -226,10 +228,16 @@ public final class TimingState {
             return;
         }
 
+        // If previous attempt is complete, reset for new attempt
+        if (!hasLiveAttempt()) {
+            resetCurrentAttempt();
+            attemptCount++;
+            cumulativeChance += lastChance;
+        }
+
         if (attemptStartNs < 0L) {
             attemptStartNs = nowNs;
-            status = "Attempt started";
-            StunSlamSimulator.LOGGER.info("Simulator: Attempt started via {} input", type);
+            status = "active";
         }
 
         double relMs = (nowNs - attemptStartNs) / 1_000_000.0;
@@ -237,28 +245,9 @@ public final class TimingState {
         lastEventNs = nowNs;
     }
 
-    private void finishAttempt(boolean incomplete) {
-        lastEvents = List.copyOf(liveEvents);
-        lastTickOffsets = tickOffsetsForRender();
-        lastFrameOffsets = frameOffsetsForRender();
-
-        if (incomplete) {
-            lastChance = 0.0;
-            status = "Incomplete attempt";
-        } else {
-            lastChance = calculateProbability(lastEvents);
-            status = "Attempt complete";
-        }
-
-        attemptCount++;
-        cumulativeChance += lastChance;
-
-        liveEvents.clear();
-        attemptStartNs = -1L;
-        lastEventNs = -1L;
-    }
-
     private double calculateProbability(List<InputEvent> events) {
+        // Need at least: AXE hotkey press, ATTACK (at least once), MACE hotkey press, ATTACK (at least once)
+        // Though with spam, there could be many more ATTACKs
         if (events.size() < 4) {
             return 0.0;
         }
