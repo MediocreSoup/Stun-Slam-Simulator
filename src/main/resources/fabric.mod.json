@@ -14,11 +14,8 @@
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/stun-slam-simulator/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"mediocresoup.stunslamsimulator.StunSlamSimulator"
-		],
 		"client": [
 			"mediocresoup.stunslamsimulator.StunSlamSimulatorClient"
 		],
