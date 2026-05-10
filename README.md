@@ -26,6 +26,6 @@ The ```/stunslam toggle``` command can toggle HUD visiblity quickly.
 
 ## Support
 
-Feature requests or bug reports are welcome on github issues tab or on the forum page for the mod on the mace discord: [Mace Discord Forum](https://discord.com/channels/1187058381849112606/1454782075759755276)
+Feature requests or bug reports are welcome on github issues tab or on the forum page for the mod on the mace discord: [Mace Discord Forum](https://discord.com/channels/1495001526345793566/1499350815461216306)
 
 The old python version is still in the legacy folder.
